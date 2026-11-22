@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dart-Zähler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: kneipentauglich, laut, aus zwei Metern lesbar
+IDEA: die Kreidetafel neben dem Oche, als Werkzeug neu gebaut
+PICTURE: eine volle, antippbare Dartscheibe
+COLOUR and TYPE: Scheibenschwarz, Sisal-Creme, Dart-Rot, Board-Grün; Barlow Condensed für Zahlen
+LAYOUT: Spielerleiste, Scheibe, Aufnahme + Tastenfeld; ab 860px zwei Spalten */
+:root{color-scheme:light dark;--bg:light-dark(#efe6d2,#121110);--panel:light-dark(#fffaf0,#1e1c19);--ink:light-dark(#16130f,#f3ead8);--mute:light-dark(#6b6152,#a89c88);--line:light-dark(#d6c9ad,#33302b);--red:#d3242e;--green:#0d8a42}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Barlow,system-ui,sans-serif;overflow:hidden}
+.app{height:100vh;height:100dvh;max-width:1200px;margin:auto;display:flex;flex-direction:column;gap:8px;padding:max(8px,env(safe-area-inset-top)) max(3vw,10px) max(8px,env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none}
+h1{font:800 24px/1 'Barlow Condensed',sans-serif;margin:0;display:inline}
+.mode{color:var(--mute);font-size:14px;display:inline;margin-left:8px;white-space:nowrap}
+header>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{min-height:38px}
+button{font:600 16px Barlow,sans-serif;color:inherit;background:var(--panel);border:2px solid var(--line);border-radius:12px;min-height:clamp(34px,5.6vh,48px);padding:0 12px;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible,label.btn:focus-within{outline:3px solid var(--red);outline-offset:2px}
+button:active{transform:translateY(1px)}
+.pri{background:var(--red);border-color:var(--red);color:#fff}
+#players{display:flex;gap:6px;overflow-x:auto;flex:none}
+.pl{flex:1 0 100px;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:4px 10px;transition:background .2s;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:6px}
+.pl .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl b{grid-column:1/-1;font:800 clamp(28px,6.5vh,56px)/1 'Barlow Condensed',sans-serif}
+.pl small{color:var(--mute);font-size:13px;grid-row:1;grid-column:2;white-space:nowrap}
+.pl.on{background:var(--red);border-color:var(--red);color:#fff}.pl.on small{color:#ffd9d9}
+.pl.win{background:var(--green);border-color:var(--green);color:#fff}
+.main{flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:8px}
+@media(min-width:720px) and (min-aspect-ratio:1/1){.main{grid-template-columns:minmax(0,1fr) minmax(320px,440px);grid-template-rows:minmax(0,1fr);align-items:center}}
+.boardbox{min-height:0;height:100%;position:relative}
+#board{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation;cursor:crosshair;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35))}
+.card{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:8px;min-height:0}
+.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:6px}
+.slot{border:2px dashed var(--line);border-radius:10px;min-height:clamp(34px,5.5vh,52px);display:grid;place-items:center;font:800 24px 'Barlow Condensed',sans-serif}
+.slot.f{border-style:solid;border-color:var(--ink)}
+.sum{display:grid;place-items:center;padding:0 8px;font:800 30px 'Barlow Condensed',sans-serif}
+#status{margin:4px 2px;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status:empty::before{content:'\00a0'}
+#status.bad{color:var(--red)}#status.ok{color:var(--green)}
+.mult{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.mult button{padding:0;font-size:15px}
+.mult button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.keys{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;margin-top:5px}
+.keys button{font:800 20px 'Barlow Condensed',sans-serif;padding:0}
+.next{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:5px;margin-top:5px}
+#nextBtn.go{background:var(--green);border-color:var(--green);color:#fff}
+label.btn{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;background:var(--ink);color:var(--bg);border-radius:12px;min-height:46px;cursor:pointer}
+label.btn input{position:absolute;opacity:0;width:1px;height:1px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:16px;z-index:5}
+.ov[hidden]{display:none}
+.sheet{background:var(--panel);color:var(--ink);border-radius:20px;padding:18px;width:min(460px,100%);max-height:90vh;overflow:auto}
+.sheet h2{font:800 28px/1.05 'Barlow Condensed',sans-serif;margin:0 0 12px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button.on{background:var(--red);border-color:var(--red);color:#fff}
+.sheet .row{display:flex;gap:6px;margin-top:8px}
+.sheet input[type=text]{flex:1;font:16px Barlow,sans-serif;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+.chk{display:flex;align-items:center;gap:10px;margin:14px 0;min-height:44px}.chk input{width:22px;height:22px;accent-color:var(--red)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.chip{font:800 24px 'Barlow Condensed',sans-serif;min-width:70px}
+.small{font-size:14px;color:var(--mute)}
+#banner{position:fixed;left:12px;right:12px;top:50%;transform:translateY(-50%);z-index:4;max-width:520px;margin:auto;box-shadow:0 12px 30px rgba(0,0,0,.4);background:var(--green);color:#fff;border-radius:16px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font:800 26px 'Barlow Condensed',sans-serif}
+#banner[hidden]{display:none}
+#banner button{background:#fff;color:#0a4d26;border-color:#fff}
+.spin{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--red);border-radius:50%;animation:sp 1s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}.pl{transition:none}}
+
+#cam{position:absolute;top:44px;left:0;width:100%;height:calc(100% - 44px);display:block;background:#000;border-radius:16px;touch-action:manipulation}
+.boardbox[data-v=board] #cam,.boardbox[data-v=board] .camui,.boardbox[data-v=board] #camStart{display:none}
+.boardbox[data-v=cam] #board{display:none}
+#camStart{position:absolute;inset:0;display:grid;place-content:center;gap:10px;text-align:center;padding:16px;background:#141210;color:#f3ead8;border-radius:16px}
+#camStart[hidden]{display:none}
+#camStart p{margin:0;font-size:14px;color:#c8bca6;max-width:340px}
+.camui{position:absolute;left:0;right:0;top:0;height:38px;display:flex;gap:5px;align-items:stretch;pointer-events:none}
+.camui>*{pointer-events:auto}
+#camStatus{flex:1;pointer-events:none;background:#141210;color:#fff;border-radius:10px;padding:0 10px;font-weight:600;font-size:13px;line-height:38px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.camui button{background:#141210;color:#fff;border-color:transparent;min-height:38px;font-size:13px;padding:0 8px}
+.sheet input[type=range]{width:100%;accent-color:var(--red);height:32px}
+.sheet select{width:100%;font:16px Barlow,sans-serif;padding:10px;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+.sheet label.l{display:block;font-weight:600;margin-top:12px}
+</style></head><body>
+<div class="app">
+<header><div><h1>Dart-Zähler</h1><div class="mode" id="modeLbl"></div></div><div style="display:flex;gap:6px;flex:none"><button id="viewBtn">📷 Kamera</button><button id="newBtn">Neu</button></div></header>
+<div id="players"></div>
+<div id="banner" hidden><span id="winTxt"></span><button id="legBtn">Nächstes Leg</button></div>
+<div class="main">
+ <div class="boardbox" id="box" data-v="board"><svg id="board" viewBox="-205 -205 410 410" role="img" aria-label="Dartscheibe, antippen um einen Wurf einzutragen"></svg>
+  <canvas id="cam" aria-label="Kamerabild der Dartscheibe"></canvas>
+  <div class="camui"><div id="camStatus">Kamera aus</div><button id="calBtn">Kalibr.</button><button id="pauseBtn">Pause</button><button id="camSetBtn" aria-label="Kamera-Einstellungen">⚙</button></div>
+  <div id="camStart"><button id="camGo" class="pri">📷 Kamera starten</button><p id="camMsg">Stell das Handy fest auf, so dass die ganze Scheibe im Bild ist – am besten unterhalb der Scheibe, schräg nach oben gerichtet. Danach tippst du 4 Punkte auf dem Doppelring an.</p></div></div>
+ <div class="card">
+  <div class="slots" id="slots"></div>
+  <p id="status"></p>
+  <div class="mult" id="mult"><button data-m="1" class="on">Single</button><button data-m="2">Double</button><button data-m="3">Triple</button><button data-k="25">25</button><button data-k="50">Bull</button><button data-k="0">Daneben</button></div>
+  <div class="keys" id="keys"></div>
+  <div class="next"><button id="undoBtn">↶ Zurück</button><button id="nextBtn" class="pri">Nächster Spieler</button></div>
+ </div>
+</div>
+</div>
+
+<div class="ov" id="setup" hidden><div class="sheet">
+ <h2>Neues Spiel</h2>
+ <div class="seg" id="modes"><button data-v="301">301</button><button data-v="501">501</button><button data-v="701">701</button><button data-v="0">Frei zählen</button></div>
+ <label class="chk"><input type="checkbox" id="dout"> Double Out (mit Doppel beenden)</label>
+ <div id="names"></div>
+ <div class="row"><button id="addPl">+ Spieler</button></div>
+ <div class="row" style="margin-top:16px"><button id="cancelSetup">Abbrechen</button><button id="startBtn" class="pri" style="flex:1">Spiel starten</button></div>
+</div></div>
+
+<div class="ov" id="camSet" hidden><div class="sheet">
+ <h2>Kamera</h2>
+ <label class="l" for="sens">Empfindlichkeit</label><input type="range" id="sens" min="1" max="9" step="1">
+ <p class="small" style="margin:0">Höher erkennt dünne Pfeile besser, reagiert aber auch auf Licht und Schatten.</p>
+ <label class="l" for="tipMode">Wo steht die Kamera?</label>
+ <select id="tipMode"><option value="below">Unterhalb der Scheibe (empfohlen)</option><option value="above">Oberhalb der Scheibe</option><option value="left">Links neben der Scheibe</option><option value="right">Rechts neben der Scheibe</option><option value="auto">Frontal / automatisch</option></select>
+ <p class="small">Daran erkennt die App, welches Ende des Pfeils die Spitze ist. Wenn Würfe oft ein Feld daneben landen: hier prüfen oder neu kalibrieren.</p>
+ <div class="row" style="margin-top:14px"><button id="camSetOk" class="pri" style="flex:1">Fertig</button></div>
+</div></div>
+
+<script>
+{
+const ORDER=[20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+const R={bi:6.35,bo:15.9,ti:99,to:107,di:162,dO:170};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const val=d=>d.n===0?0:d.m*d.n;
+const lab=d=>d.n===0?'–':d.n===25?(d.m===2?'Bull':'25'):(d.m===3?'T':d.m===2?'D':'')+d.n;
+const fresh=c=>({mode:c.mode,dout:c.dout,cur:0,turn:[],winner:null,log:[],players:c.names.map(n=>({name:n,score:c.mode||0,turns:[]}))});
+function load(){try{return JSON.parse(localStorage.getItem('dartz1'))}catch(e){return null}}
+function save(){try{localStorage.setItem('dartz1',JSON.stringify(st))}catch(e){}}
+let st=load();if(!st||!st.players)st=fresh({mode:501,dout:true,names:['Spieler 1','Spieler 2']});
+let mult=1;
+
+/* Scheibe zeichnen */
+const pt=(r,a)=>{a=a*Math.PI/180;return (r*Math.sin(a)).toFixed(2)+' '+(-r*Math.cos(a)).toFixed(2)};
+const seg=(r1,r2,a1,a2,c)=>`<path d="M${pt(r2,a1)}A${r2} ${r2} 0 0 1 ${pt(r2,a2)}L${pt(r1,a2)}A${r1} ${r1} 0 0 0 ${pt(r1,a1)}Z" fill="${c}"/>`;
+let g=`<circle r="202" fill="#2a2622"/><circle r="198" fill="#141210"/><g stroke="#b8b2a6" stroke-width=".9">`;
+ORDER.forEach((n,i)=>{const a1=i*18-9,a2=a1+18,dark=i%2===0;const s=dark?'#161412':'#ecdfc2',r=dark?'#d3242e':'#0d8a42';
+ g+=seg(R.bo,R.ti,a1,a2,s)+seg(R.ti,R.to,a1,a2,r)+seg(R.to,R.di,a1,a2,s)+seg(R.di,R.dO,a1,a2,r)});
+g+=`<circle r="${R.bo}" fill="#0d8a42"/><circle r="${R.bi}" fill="#d3242e"/></g>`;
+ORDER.forEach((n,i)=>{const p=pt(186,i*18).split(' ');g+=`<text x="${p[0]}" y="${p[1]}" fill="#ecdfc2" font-family="Barlow Condensed,sans-serif" font-weight="800" font-size="22" text-anchor="middle" dominant-baseline="central">${n}</text>`});
+g+=`<g id="hits"></g>`;
+const svg=$('#board');svg.innerHTML=g;
+
+function hit(x,y){const r=Math.hypot(x,y);if(r<=R.bi)return{m:2,n:25};if(r<=R.bo)return{m:1,n:25};if(r>R.dO)return{m:1,n:0};
+ const a=(Math.atan2(x,-y)*180/Math.PI+369)%360;const n=ORDER[Math.floor(a/18)%20];
+ return{m:r>R.di?2:(r>R.ti&&r<=R.to)?3:1,n}}
+svg.addEventListener('pointerdown',ev=>{const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());
+ if(Math.hypot(q.x,q.y)>202)return;addDart({...hit(q.x,q.y),x:+q.x.toFixed(1),y:+q.y.toFixed(1)})});
+
+/* Spiellogik */
+function evalTurn(){const p=st.players[st.cur],sum=st.turn.reduce((a,d)=>a+val(d),0);
+ if(!st.mode)return{sum,rem:p.score+sum,bust:false,win:false};
+ const rem=p.score-sum,last=st.turn[st.turn.length-1];let bust=rem<0||(st.dout&&rem===1),win=false;
+ if(rem===0){if(st.dout&&last&&last.m!==2)bust=true;else win=true}
+ return{sum,rem,bust,win}}
+const done=()=>{const e=evalTurn();return st.turn.length>=3||e.bust||e.win};
+function addDart(d){if(st.winner!==null||done())return;st.turn.push(d);mult=1;if(evalTurn().win)commit();save();render()}
+function commit(){const e=evalTurn(),p=st.players[st.cur],before=p.score;
+ if(!e.bust)p.score=st.mode?e.rem:before+e.sum;
+ p.turns.push(e.bust?0:e.sum);st.log.push({p:st.cur,darts:st.turn,before});st.turn=[];
+ if(e.win){st.winner=st.cur;return}
+ st.cur=(st.cur+1)%st.players.length}
+function undo(){if(st.turn.length){st.turn.pop()}else if(st.log.length){const l=st.log.pop(),p=st.players[l.p];
+ p.score=l.before;p.turns.pop();st.cur=l.p;st.winner=null;st.turn=l.darts.slice(0,-1)}save();render()}
+
+const DOUBLES=[20,16,8,10,12,18,4,6,14,2,19,17,15,13,11,9,7,5,3,1,25].map(n=>({m:2,n}));
+const SETUP=[...[20,19,18,17,16,15,14,13,12,11,10].map(n=>({m:3,n})),...Array.from({length:20},(_,i)=>({m:1,n:20-i})),{m:1,n:25},{m:2,n:25},...[9,8,7,6,5,4,3,2,1].map(n=>({m:3,n}))];
+function checkout(rem,left){if(!st.mode||rem>170||rem<2||left<1)return null;
+ if(!st.dout){for(const a of [...SETUP,...DOUBLES])if(val(a)===rem)return[a];return null}
+ for(let k=1;k<=left;k++)for(const f of DOUBLES){const need=rem-val(f);if(need<0)continue;
+  if(k===1){if(need===0)return[f]}
+  else if(k===2){for(const a of SETUP)if(val(a)===need)return[a,f]}
+  else for(const a of SETUP)for(const b of SETUP)if(val(a)+val(b)===need)return[a,b,f]}
+ return null}
+
+/* Anzeige */
+function render(){const e=evalTurn();
+ $('#modeLbl').textContent=st.mode?`${st.mode}${st.dout?' · Double Out':' · Single Out'}`:'Frei zählen';
+ $('#players').innerHTML=st.players.map((p,i)=>{const live=i===st.cur&&st.winner===null;
+  const shown=live?(st.mode?(e.bust?p.score:e.rem):e.rem):p.score;
+  const avg=p.turns.length?(p.turns.reduce((a,t)=>a+t,0)/p.turns.length).toFixed(1):'–';
+  return `<div class="pl${live?' on':''}${st.winner===i?' win':''}"><span class="nm">${esc(p.name)}</span><b>${shown}</b><small>Ø ${avg}</small></div>`}).join('');
+ const s=[0,1,2].map(i=>{const d=st.turn[i];return `<div class="slot${d?' f':''}">${d?lab(d):''}</div>`}).join('');
+ $('#slots').innerHTML=s+`<div class="sum">${e.sum}</div>`;
+ const stt=$('#status');stt.className='';
+ if(st.winner!==null){stt.textContent='';}
+ else if(e.bust){stt.className='bad';stt.textContent='Überworfen – diese Aufnahme zählt nicht.'}
+ else if(st.turn.length>=3){stt.textContent='3 Pfeile geworfen – weiter zum nächsten Spieler.'}
+ else{const co=checkout(e.rem,3-st.turn.length);
+  if(co){stt.className='ok';stt.textContent='Checkout: '+co.map(lab).join(' · ')}
+  else stt.textContent=`${esc(st.players[st.cur].name)} wirft – Pfeil ${st.turn.length+1} von 3`}
+ $('#nextBtn').classList.toggle('go',done()&&st.winner===null);
+ $('#nextBtn').disabled=st.winner!==null;
+ document.querySelectorAll('#mult [data-m]').forEach(b=>b.classList.toggle('on',+b.dataset.m===mult));
+ $('#hits').innerHTML=st.turn.filter(d=>d.x!=null).map((d,i)=>`<circle cx="${d.x}" cy="${d.y}" r="7" fill="#fff" stroke="#111" stroke-width="2.5"/><text x="${d.x}" y="${d.y+.5}" font-size="9" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#111">${st.turn.indexOf(d)+1}</text>`).join('');
+ const b=$('#banner');b.hidden=st.winner===null;if(st.winner!==null)$('#winTxt').textContent=`🎯 ${st.players[st.winner].name} gewinnt das Leg!`}
+
+/* Tastenfeld */
+$('#keys').innerHTML=Array.from({length:20},(_,i)=>`<button data-n="${i+1}">${i+1}</button>`).join('');
+$('#keys').addEventListener('click',ev=>{const b=ev.target.closest('button');if(b)addDart({m:mult,n:+b.dataset.n})});
+$('#mult').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;if(b.dataset.m){mult=+b.dataset.m;render();return}const k=+b.dataset.k;
+ addDart(k===50?{m:2,n:25}:k===25?{m:1,n:25}:{m:1,n:0})});
+$('#undoBtn').onclick=undo;
+$('#nextBtn').onclick=()=>{if(st.winner!==null)return;commit();save();render()};
+$('#legBtn').onclick=()=>{const w=st.winner;st.players.forEach(p=>{p.score=st.mode||0;p.turns=[]});st.log=[];st.turn=[];st.winner=null;
+ st.cur=(w+1)%st.players.length;save();render()};
+
+/* Neues Spiel */
+let cfg;
+function drawSetup(){document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',+b.dataset.v===cfg.mode));
+ $('#dout').checked=cfg.dout;$('#dout').disabled=!cfg.mode;
+ $('#names').innerHTML=cfg.names.map((n,i)=>`<div class="row"><input type="text" id="pn${i}" value="${esc(n)}" aria-label="Name Spieler ${i+1}"><button data-rm="${i}" aria-label="Spieler entfernen"${cfg.names.length<2?' disabled':''}>✕</button></div>`).join('');
+ $('#addPl').disabled=cfg.names.length>=6}
+const readNames=()=>{cfg.names=cfg.names.map((n,i)=>{const el=$('#pn'+i);return el?el.value:n})};
+$('#newBtn').onclick=()=>{cfg={mode:st.mode,dout:st.dout,names:st.players.map(p=>p.name)};drawSetup();$('#setup').hidden=false};
+$('#modes').addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;readNames();cfg.mode=+b.dataset.v;drawSetup()});
+$('#dout').onchange=e=>{cfg.dout=e.target.checked};
+$('#addPl').onclick=()=>{readNames();cfg.names.push('Spieler '+(cfg.names.length+1));drawSetup()};
+$('#names').addEventListener('click',ev=>{const b=ev.target.closest('[data-rm]');if(!b)return;readNames();cfg.names.splice(+b.dataset.rm,1);drawSetup()});
+$('#cancelSetup').onclick=()=>{$('#setup').hidden=true};
+$('#startBtn').onclick=()=>{readNames();cfg.names=cfg.names.map((n,i)=>n.trim()||'Spieler '+(i+1));st=fresh(cfg);save();$('#setup').hidden=true;render()};
+
+
+/* ===== Kamera ===== */
+const cv=$('#cam'),cx=cv.getContext('2d'),box=$('#box');
+const video=document.createElement('video');video.playsInline=true;video.muted=true;video.setAttribute('playsinline','');
+let camOn=false,paused=false,H=null,Hi=null,calPts=[],calibrating=false,fit={s:1,ox:0,oy:0},dpr=1,lastTip=null,lastProc=0,wakeLock=null;
+let camCfg={sens:5,pos:'below'};try{Object.assign(camCfg,JSON.parse(localStorage.getItem('dartcam'))||{})}catch(e){}
+const thr=()=>54-camCfg.sens*5;
+const CAL=[[0,-170,'oben: äußerer Rand des Doppelrings über der 20'],[170,0,'rechts: äußerer Rand des Doppelrings bei der 6'],[0,170,'unten: 
